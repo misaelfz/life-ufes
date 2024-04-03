@@ -3,7 +3,45 @@ import matplotlib.pyplot as plt
 from torch import nn, optim, max, save, no_grad
 
 
-def train(model, train_set, optimizer, loss_function):
+def train_model(epochs, model, train_set, val_set, path, lr, device):
+    optimizer = optim.Adam(model.parameters(), lr)
+    loss_function = nn.CrossEntropyLoss()
+    cuda = device == "cuda"
+
+    train_loss = []
+    val_loss = []
+    train_acc = []
+    val_acc = []
+    best = -1
+
+    time_start = time.time()
+
+    for epoch in range(epochs):
+        print("EPOCH [{}/{}]".format(epoch + 1, epochs))
+
+        loss, accuracy = train(model, train_set, optimizer, loss_function, cuda)
+        train_loss.append(loss)
+        train_acc.append(accuracy)
+        print("TRAIN: Loss [{:.3f}] | Accuracy [{:.2f}%]".format(loss, accuracy))
+
+        loss, accuracy = validate(model, val_set, loss_function, cuda)
+        val_loss.append(loss)
+        val_acc.append(accuracy)
+        print("VALIDATION: Loss [{:.3f}] | Accuracy [{:.2f}%]\n".format(loss, accuracy))
+
+        if accuracy > best:
+            best = accuracy
+            save(model.state_dict(), f"{path}/best.pth")
+
+        save(model.state_dict(), f"{path}/epoch_{epoch + 1:02}.pth")
+
+    time_elapsed = time.time() - time_start
+    save(model.state_dict(), f"{path}/model.pth")
+    plot(train_loss, val_loss, train_acc, val_acc)
+    print("\nTraining complete in {:.1f} seconds\n".format(time_elapsed))
+
+
+def train(model, train_set, optimizer, loss_function, cuda):
     model.train()
 
     losses = 0.0
@@ -11,6 +49,9 @@ def train(model, train_set, optimizer, loss_function):
     total = 0
 
     for images, labels in train_set:
+        if cuda:
+            images, labels = images.cuda(), labels.cuda()
+
         output, _ = model(images)
         loss = loss_function(output, labels)
         optimizer.zero_grad()
@@ -27,7 +68,7 @@ def train(model, train_set, optimizer, loss_function):
     return losses, accuracy
 
 
-def validate(model, val_set, loss_function):
+def validate(model, val_set, loss_function, cuda):
     model.eval()
 
     losses = 0.0
@@ -36,6 +77,9 @@ def validate(model, val_set, loss_function):
 
     with no_grad():
         for images, labels in val_set:
+            if cuda:
+                images, labels = images.cuda(), labels.cuda()
+
             output, _ = model(images)
             loss = loss_function(output, labels)
             losses += loss.item()
@@ -68,40 +112,3 @@ def plot(train_loss, val_loss, train_acc, val_acc):
     plt.legend()
 
     plt.show()
-
-
-def train_model(epochs, model, train_set, val_set, path, lr):
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr)
-
-    train_loss = []
-    val_loss = []
-    train_acc = []
-    val_acc = []
-    best = -1
-
-    time_start = time.time()
-
-    for epoch in range(epochs):
-        print("EPOCH [{}/{}]".format(epoch + 1, epochs))
-
-        loss, accuracy = train(model, train_set, optimizer, loss_function)
-        train_loss.append(loss)
-        train_acc.append(accuracy)
-        print("TRAIN: Loss [{:.3f}] | Accuracy [{:.2f}%]".format(loss, accuracy))
-
-        loss, accuracy = validate(model, val_set, loss_function)
-        val_loss.append(loss)
-        val_acc.append(accuracy)
-        print("VALIDATION: Loss [{:.3f}] | Accuracy [{:.2f}%]\n".format(loss, accuracy))
-
-        if accuracy > best:
-            best = accuracy
-            save(model.state_dict(), f"{path}/best.pth")
-
-        save(model.state_dict(), f"{path}/epoch_{epoch + 1:02}.pth")
-
-    time_elapsed = time.time() - time_start
-    save(model.state_dict(), f"{path}/model.pth")
-    plot(train_loss, val_loss, train_acc, val_acc)
-    print("\nTraining complete in {:.1f} seconds\n".format(time_elapsed))

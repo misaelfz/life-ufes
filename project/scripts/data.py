@@ -1,5 +1,4 @@
 import os
-import torch
 import pickle
 import shutil
 from random import choice
@@ -44,7 +43,7 @@ def save_augmented(path, batch_size):
     file = os.path.join(path, "augmented.pkl")
 
     if not os.path.exists(file):
-        mnist = get_dataset(path, "mnist.pkl")
+        mnist = get_dataset(path, "mnist")
         recrop = v2.RandomResizedCrop(28, (0.33, 0.5))
         rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -30), (30, 45)]))(x)
 
@@ -67,7 +66,7 @@ def save_classified(path, model):
     file = os.path.join(path, "classified.pkl")
 
     if not os.path.exists(file):
-        augmented = get_dataset(path, "augmented.pkl")
+        augmented = get_dataset(path, "augmented")
         classified = {}
         model.eval()
 
@@ -89,9 +88,18 @@ def save_classified(path, model):
             pickle.dump(classified, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def check_datasets(path):
+    files = ["mnist.pkl", "augmented.pkl", "classified.pkl"]
+
+    for file in files:
+        assert os.path.exists(os.path.join(path, file))
+
+    print("All datasets are available.")
+
+
 def plot_batch(dataset, batch_size):
     for images, labels in dataset:
-        rows = int(batch_size / 100)
+        rows = int(batch_size / 10)
         cols = int(10)
 
         plt.figure(figsize=(40, 4 * rows))
