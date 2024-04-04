@@ -33,21 +33,20 @@ def train_model(epochs, model, train_set, val_set, path, lr, device):
             best = accuracy
             save(model.state_dict(), f"{path}/best.pth")
 
-        save(model.state_dict(), f"{path}/epoch_{epoch + 1:02}.pth")
+        # save(model.state_dict(), f"{path}/epoch{epoch + 1:02}.pth")
 
     time_elapsed = time.time() - time_start
-    save(model.state_dict(), f"{path}/model.pth")
+    # save(model.state_dict(), f"{path}/model.pth")
     plot(train_loss, val_loss, train_acc, val_acc)
     print("\nTraining complete in {:.1f} seconds\n".format(time_elapsed))
 
 
 def train(model, train_set, optimizer, loss_function, cuda):
-    model.train()
-
     losses = 0.0
     correct = 0
     total = 0
 
+    model.train()
     for images, labels in train_set:
         if cuda:
             images, labels = images.cuda(), labels.cuda()
@@ -69,12 +68,11 @@ def train(model, train_set, optimizer, loss_function, cuda):
 
 
 def validate(model, val_set, loss_function, cuda):
-    model.eval()
-
     losses = 0.0
     correct = 0
     total = 0
 
+    model.eval()
     with no_grad():
         for images, labels in val_set:
             if cuda:

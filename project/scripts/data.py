@@ -2,6 +2,7 @@ import os
 import pickle
 import shutil
 from random import choice
+from torch import no_grad
 import matplotlib.pyplot as plt
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
@@ -68,28 +69,49 @@ def save_classified(path, model):
     if not os.path.exists(file):
         augmented = get_dataset(path, "augmented")
         classified = {}
+
         model.eval()
+        with no_grad():
+            for images, labels in augmented:
+                logits, embeddings = model(images)
 
-        for images, labels in augmented:
-            logits, embeddings = model(images)
+                for i in range(len(images)):
+                    image = images[i].detach().numpy()
+                    label = labels[i].item()
+                    logit = logits[i].detach().numpy()
+                    embedding = embeddings[i].detach().numpy()
 
-            for i in range(len(images)):
-                image = images[i].detach().numpy()
-                label = labels[i].item()
-                logit = logits[i].detach().numpy()
-                embedding = embeddings[i].detach().numpy()
+                    if label not in classified:
+                        classified[label] = [(image, label, logit, embedding)]
+                    else:
+                        classified[label].append((image, label, logit, embedding))
 
-                if label not in classified:
-                    classified[label] = [(image, label, logit, embedding)]
-                else:
-                    classified[label].append((image, label, logit, embedding))
+            with open(file, "wb") as handle:
+                pickle.dump(classified, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def save_random(path, batch_size):
+    file = os.path.join(path, "random.pkl")
+
+    if not os.path.exists(file):
+        classified = get_dataset(path, "classified")
+        size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
+        random = []
+
+        for _ in range(size):
+            for key in classified.keys():
+                index = choice(range(len(classified[key])))
+                image, label, _, _ = classified[key].pop(index)
+                random.append((image, label))
+
+        random = DataLoader(random, batch_size=batch_size, shuffle=True)
 
         with open(file, "wb") as handle:
-            pickle.dump(classified, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(random, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def check_datasets(path):
-    files = ["mnist.pkl", "augmented.pkl", "classified.pkl"]
+    files = ["mnist.pkl", "augmented.pkl", "classified.pkl", "random.pkl"]
 
     for file in files:
         assert os.path.exists(os.path.join(path, file))
@@ -97,10 +119,10 @@ def check_datasets(path):
     print("All datasets are available.")
 
 
-def plot_batch(dataset, batch_size):
+def plot_batch(dataset):
     for images, labels in dataset:
-        rows = int(batch_size / 10)
-        cols = int(10)
+        rows = 10
+        cols = 10
 
         plt.figure(figsize=(40, 4 * rows))
 
