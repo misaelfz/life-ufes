@@ -18,8 +18,8 @@ def test_model(model, test_set, device):
             if cuda:
                 images, labels = images.cuda(), labels.cuda()
 
-            output, _ = model(images)
-            _, predict = max(output.data, 1)
+            logits, _ = model(images)
+            _, predict = max(logits.data, 1)
             total += labels.size(0)
             correct += (predict == labels).sum().item()
 
@@ -78,7 +78,7 @@ def plot_embeddings(model, test_set, data_path, device):
                     entry = {"image": image, "label": label, "embedding": embedding}
                     data.append(entry)
 
-        with open(data_path + "/embeddings", "wb") as handle:
+        with open(file, "wb") as handle:
             pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     else:

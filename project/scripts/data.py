@@ -2,10 +2,11 @@ import os
 import pickle
 import shutil
 from random import choice
-from torch import no_grad
 import matplotlib.pyplot as plt
+from scipy import stats, spatial
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
+from torch import no_grad, tensor, softmax
 from torchvision.transforms import ToTensor, v2
 from sklearn.model_selection import train_test_split
 
@@ -45,8 +46,8 @@ def save_augmented(path, batch_size):
 
     if not os.path.exists(file):
         mnist = get_dataset(path, "mnist")
-        recrop = v2.RandomResizedCrop(28, (0.33, 0.5))
-        rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -30), (30, 45)]))(x)
+        recrop = v2.RandomResizedCrop(28, (0.5, 0.5))
+        rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -45), (45, 45)]))(x)
 
         augmented = []
 
@@ -76,10 +77,10 @@ def save_classified(path, model):
                 logits, embeddings = model(images)
 
                 for i in range(len(images)):
-                    image = images[i].detach().numpy()
+                    image = images[i].numpy()
                     label = labels[i].item()
-                    logit = logits[i].detach().numpy()
-                    embedding = embeddings[i].detach().numpy()
+                    logit = logits[i].numpy()
+                    embedding = embeddings[i].numpy()
 
                     if label not in classified:
                         classified[label] = [(image, label, logit, embedding)]
@@ -90,13 +91,16 @@ def save_classified(path, model):
                 pickle.dump(classified, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def save_random(path, batch_size):
+def save_random(path, batch_size, subset_ratio):
     file = os.path.join(path, "random.pkl")
 
     if not os.path.exists(file):
         classified = get_dataset(path, "classified")
-        size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
+
         random = []
+        size = int(
+            (sum(len(v) for v in classified.values()) * subset_ratio) / len(classified)
+        )
 
         for _ in range(size):
             for key in classified.keys():
@@ -110,8 +114,46 @@ def save_random(path, batch_size):
             pickle.dump(random, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def save_entropy(path, batch_size, subset_ratio):
+    file = os.path.join(path, "entropy.pkl")
+
+    if not os.path.exists(file):
+        classified = get_dataset(path, "classified")
+
+        for key in classified:
+            for i in range(len(classified[key])):
+                image, label, logits, embeddings = classified[key][i]
+                probabilities = softmax(tensor(logits), dim=0).numpy()
+                entropy = stats.entropy(pk=probabilities, base=2)
+                classified[key][i] = (entropy, (image, label, logits, embeddings))
+
+            classified[key].sort(key=lambda x: x[0], reverse=True)
+
+        entropy = []
+        size = int(
+            (sum(len(v) for v in classified.values()) * subset_ratio) / len(classified)
+        )
+
+        for _ in range(size):
+            for key in classified.keys():
+                _, item = classified[key].pop(0)
+                image, label, _, _ = item
+                entropy.append((image, label))
+
+        entropy = DataLoader(entropy, batch_size=batch_size, shuffle=True)
+
+        with open(file, "wb") as handle:
+            pickle.dump(entropy, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 def check_datasets(path):
-    files = ["mnist.pkl", "augmented.pkl", "classified.pkl", "random.pkl"]
+    files = [
+        "mnist.pkl",
+        "augmented.pkl",
+        "classified.pkl",
+        "random.pkl",
+        "entropy.pkl",
+    ]
 
     for file in files:
         assert os.path.exists(os.path.join(path, file))

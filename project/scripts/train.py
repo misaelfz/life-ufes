@@ -4,7 +4,7 @@ from torch import nn, optim, max, save, no_grad
 
 
 def train_model(epochs, model, train_set, val_set, path, lr, device):
-    optimizer = optim.Adam(model.parameters(), lr)
+    optimizer = optim.Adam(model.parameters(), lr, weight_decay=0.001)
     loss_function = nn.CrossEntropyLoss()
     cuda = device == "cuda"
 
@@ -51,13 +51,13 @@ def train(model, train_set, optimizer, loss_function, cuda):
         if cuda:
             images, labels = images.cuda(), labels.cuda()
 
-        output, _ = model(images)
-        loss = loss_function(output, labels)
+        logits, _ = model(images)
+        loss = loss_function(logits, labels)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         losses += loss.item()
-        _, predict = max(output.data, 1)
+        _, predict = max(logits.data, 1)
         total += labels.size(0)
         correct += (predict == labels).sum().item()
 
@@ -78,10 +78,10 @@ def validate(model, val_set, loss_function, cuda):
             if cuda:
                 images, labels = images.cuda(), labels.cuda()
 
-            output, _ = model(images)
-            loss = loss_function(output, labels)
+            logits, _ = model(images)
+            loss = loss_function(logits, labels)
             losses += loss.item()
-            _, predict = max(output.data, 1)
+            _, predict = max(logits.data, 1)
             total += labels.size(0)
             correct += (predict == labels).sum().item()
 
