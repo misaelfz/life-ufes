@@ -1,9 +1,9 @@
 import os
+import umap
 import pickle
 import shutil
 from scipy import stats
 from random import choice
-import umap.umap_ as umap
 import matplotlib.pyplot as plt
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
@@ -37,9 +37,7 @@ def save_mnist(path, batch_size):
         test = MNIST(root="download", train=False, download=True, transform=ToTensor())
         shutil.rmtree("download")
 
-        train, val = train_test_split(
-            train, train_size=50000, test_size=10000, random_state=13
-        )
+        train, val = train_test_split(train, train_size=50000, test_size=10000, random_state=13)
 
         mnist = {
             "train": DataLoader(train, batch_size=batch_size, shuffle=True),
@@ -163,8 +161,6 @@ def check_datasets(path):
 
     for file in files:
         assert os.path.exists(os.path.join(path, file))
-
-    print("datasets verified.")
 
 
 def plot_batch(dataset, predicts):
