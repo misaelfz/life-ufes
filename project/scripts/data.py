@@ -1,9 +1,10 @@
 import os
 import pickle
 import shutil
+from scipy import stats
 from random import choice
+import umap.umap_ as umap
 import matplotlib.pyplot as plt
-from scipy import stats, spatial
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 from torch import no_grad, tensor, softmax
@@ -11,8 +12,17 @@ from torchvision.transforms import ToTensor, v2
 from sklearn.model_selection import train_test_split
 
 
+def save_datasets(data_path, model, batch_size):
+    save_mnist(data_path, batch_size)
+    save_augmented(data_path, batch_size)
+    save_classified(data_path, model)
+    save_random(data_path, batch_size)
+    save_entropy(data_path, batch_size)
+    check_datasets(data_path)
+
+
 def get_dataset(path, target):
-    file = os.path.join(path, f"{target}.pkl")
+    file = os.path.join(path, f"{target}_dataset.pkl")
     assert os.path.exists(file)
 
     with open(file, "rb") as handle:
@@ -20,7 +30,7 @@ def get_dataset(path, target):
 
 
 def save_mnist(path, batch_size):
-    file = os.path.join(path, "mnist.pkl")
+    file = os.path.join(path, "mnist_dataset.pkl")
 
     if not os.path.exists(file):
         train = MNIST(root="download", train=True, download=True, transform=ToTensor())
@@ -42,12 +52,12 @@ def save_mnist(path, batch_size):
 
 
 def save_augmented(path, batch_size):
-    file = os.path.join(path, "augmented.pkl")
+    file = os.path.join(path, "augmented_dataset.pkl")
 
     if not os.path.exists(file):
         mnist = get_dataset(path, "mnist")
-        recrop = v2.RandomResizedCrop(28, (0.5, 0.5))
-        rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -45), (45, 45)]))(x)
+        recrop = v2.RandomResizedCrop(28, (0.5, 0.75))
+        rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -30), (30, 45)]))(x)
 
         augmented = []
 
@@ -65,7 +75,7 @@ def save_augmented(path, batch_size):
 
 
 def save_classified(path, model):
-    file = os.path.join(path, "classified.pkl")
+    file = os.path.join(path, "classified_dataset.pkl")
 
     if not os.path.exists(file):
         augmented = get_dataset(path, "augmented")
@@ -91,16 +101,14 @@ def save_classified(path, model):
                 pickle.dump(classified, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def save_random(path, batch_size, subset_ratio):
-    file = os.path.join(path, "random.pkl")
+def save_random(path, batch_size):
+    file = os.path.join(path, "random_dataset.pkl")
 
     if not os.path.exists(file):
         classified = get_dataset(path, "classified")
 
         random = []
-        size = int(
-            (sum(len(v) for v in classified.values()) * subset_ratio) / len(classified)
-        )
+        size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
 
         for _ in range(size):
             for key in classified.keys():
@@ -114,8 +122,8 @@ def save_random(path, batch_size, subset_ratio):
             pickle.dump(random, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def save_entropy(path, batch_size, subset_ratio):
-    file = os.path.join(path, "entropy.pkl")
+def save_entropy(path, batch_size):
+    file = os.path.join(path, "entropy_dataset.pkl")
 
     if not os.path.exists(file):
         classified = get_dataset(path, "classified")
@@ -130,9 +138,7 @@ def save_entropy(path, batch_size, subset_ratio):
             classified[key].sort(key=lambda x: x[0], reverse=True)
 
         entropy = []
-        size = int(
-            (sum(len(v) for v in classified.values()) * subset_ratio) / len(classified)
-        )
+        size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
 
         for _ in range(size):
             for key in classified.keys():
@@ -148,20 +154,20 @@ def save_entropy(path, batch_size, subset_ratio):
 
 def check_datasets(path):
     files = [
-        "mnist.pkl",
-        "augmented.pkl",
-        "classified.pkl",
-        "random.pkl",
-        "entropy.pkl",
+        "mnist_dataset.pkl",
+        "augmented_dataset.pkl",
+        "classified_dataset.pkl",
+        "random_dataset.pkl",
+        "entropy_dataset.pkl",
     ]
 
     for file in files:
         assert os.path.exists(os.path.join(path, file))
 
-    print("All datasets are available.")
+    print("datasets verified.")
 
 
-def plot_batch(dataset):
+def plot_batch(dataset, predicts):
     for images, labels in dataset:
         rows = 10
         cols = 10
@@ -174,7 +180,63 @@ def plot_batch(dataset):
             plt.yticks([])
             plt.grid(False)
             plt.imshow(images[i].permute(1, 2, 0), cmap="gray")
-            plt.title("{}".format(labels[i]), fontsize=27)
+
+            title = "{}".format(labels[i])
+            fontsize = 27
+            color = "black"
+
+            if predicts is not None:
+                if predicts[i] == labels[i]:
+                    title = "{}".format(predicts[i])
+                    color = "green"
+                else:
+                    title = "{} (correct: {})".format(predicts[i], labels[i])
+                    color = "red"
+
+            plt.title(title, fontsize=fontsize, color=color)
 
         plt.show()
         break
+
+
+def save_embeddings(model, target, dataset, data_path, device):
+    cuda = device == "cuda"
+
+    file = os.path.join(data_path, f"{target}_embeddings.pkl")
+
+    if not os.path.exists(file):
+        data = []
+
+        model.eval()
+        with no_grad():
+            for images, labels in dataset:
+                if cuda:
+                    images, labels = images.cuda(), labels.cuda()
+
+                _, embeddings = model(images)
+
+                for i in range(len(images)):
+                    embedding = embeddings[i].numpy()
+                    label = labels[i].item()
+                    entry = {"embedding": embedding, "label": label}
+                    data.append(entry)
+
+        with open(file, "wb") as handle:
+            pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def plot_embeddings(data_path, target):
+    file = os.path.join(data_path, f"{target}_embeddings.pkl")
+
+    with open(file, "rb") as handle:
+        data = pickle.load(handle)
+
+    embeddings = [entry["embedding"] for entry in data[:1000]]
+    labels = [entry["label"] for entry in data[:1000]]
+    reducer = umap.UMAP()
+    embeddings = reducer.fit_transform(embeddings)
+
+    plt.scatter(embeddings[:, 0], embeddings[:, 1], c=labels, cmap="tab10")
+    plt.colorbar()
+    plt.title("MNIST")
+    plt.show()
