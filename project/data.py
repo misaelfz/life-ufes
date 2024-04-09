@@ -1,5 +1,4 @@
 import os
-import umap
 import pickle
 import shutil
 from scipy import stats
@@ -10,6 +9,13 @@ from torch.utils.data import DataLoader
 from torch import no_grad, tensor, softmax
 from torchvision.transforms import ToTensor, v2
 from sklearn.model_selection import train_test_split
+
+
+try:
+    import umap.umap_ as umap
+except:
+    !pip install umap-learn
+    import umap.umap_ as umap
 
 
 def save_datasets(data_path, model, batch_size):
@@ -221,7 +227,7 @@ def save_embeddings(model, target, dataset, data_path, device):
             pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def plot_embeddings(data_path, target):
+def plot_embeddings(target, data_path):
     file = os.path.join(data_path, f"{target}_embeddings.pkl")
 
     with open(file, "rb") as handle:
