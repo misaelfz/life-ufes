@@ -55,7 +55,9 @@ def save_augmented(path, batch_size):
             pickle.dump(augmented, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def save_classified(path, model):
+def save_classified(path, model, device):
+    cuda = device == "cuda"
+
     file = os.path.join(path, "classified_dataset.pkl")
 
     if not os.path.exists(file):
@@ -65,6 +67,9 @@ def save_classified(path, model):
         model.eval()
         with no_grad():
             for images, labels in augmented:
+                if cuda:
+                    images, labels = images.cuda(), labels.cuda()
+
                 logits, embeddings = model(images)
 
                 for i in range(len(images)):
@@ -146,10 +151,10 @@ def check_datasets(path):
         assert os.path.exists(os.path.join(path, file))
 
 
-def save_datasets(data_path, model, batch_size):
+def save_datasets(data_path, model, batch_size, device):
     save_mnist(data_path, batch_size)
     save_augmented(data_path, batch_size)
-    save_classified(data_path, model)
+    save_classified(data_path, model, device)
     save_random(data_path, batch_size)
     save_entropy(data_path, batch_size)
     check_datasets(data_path)
