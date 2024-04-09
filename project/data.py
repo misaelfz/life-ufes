@@ -3,36 +3,13 @@ import pickle
 import shutil
 from scipy import stats
 from random import choice
+import umap.umap_ as umap
 import matplotlib.pyplot as plt
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 from torch import no_grad, tensor, softmax
 from torchvision.transforms import ToTensor, v2
 from sklearn.model_selection import train_test_split
-
-
-try:
-    import umap.umap_ as umap
-except:
-    !pip install umap-learn
-    import umap.umap_ as umap
-
-
-def save_datasets(data_path, model, batch_size):
-    save_mnist(data_path, batch_size)
-    save_augmented(data_path, batch_size)
-    save_classified(data_path, model)
-    save_random(data_path, batch_size)
-    save_entropy(data_path, batch_size)
-    check_datasets(data_path)
-
-
-def get_dataset(path, target):
-    file = os.path.join(path, f"{target}_dataset.pkl")
-    assert os.path.exists(file)
-
-    with open(file, "rb") as handle:
-        return pickle.load(handle)
 
 
 def save_mnist(path, batch_size):
@@ -167,6 +144,23 @@ def check_datasets(path):
 
     for file in files:
         assert os.path.exists(os.path.join(path, file))
+
+
+def save_datasets(data_path, model, batch_size):
+    save_mnist(data_path, batch_size)
+    save_augmented(data_path, batch_size)
+    save_classified(data_path, model)
+    save_random(data_path, batch_size)
+    save_entropy(data_path, batch_size)
+    check_datasets(data_path)
+
+
+def get_dataset(path, target):
+    file = os.path.join(path, f"{target}_dataset.pkl")
+    assert os.path.exists(file)
+
+    with open(file, "rb") as handle:
+        return pickle.load(handle)
 
 
 def plot_batch(dataset, predicts):
