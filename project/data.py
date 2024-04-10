@@ -37,7 +37,7 @@ def save_augmented(path, batch_size):
 
     if not os.path.exists(file):
         mnist = get_dataset(path, "mnist")
-        recrop = v2.RandomResizedCrop(28, (0.5, 0.75))
+        recrop = v2.RandomResizedCrop(28, (0.50, 0.66))
         rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -30), (30, 45)]))(x)
 
         augmented = []
@@ -68,9 +68,12 @@ def save_classified(path, model, device):
         with no_grad():
             for images, labels in augmented:
                 if cuda:
-                    images, labels = images.cuda(), labels.cuda()
+                    images = images.cuda()
 
                 logits, embeddings = model(images)
+
+                if cuda:
+                    images, logits, embeddings = images.cpu(), logits.cpu(), embeddings.cpu()
 
                 for i in range(len(images)):
                     image = images[i].numpy()
@@ -212,9 +215,12 @@ def save_embeddings(model, target, dataset, data_path, device):
         with no_grad():
             for images, labels in dataset:
                 if cuda:
-                    images, labels = images.cuda(), labels.cuda()
+                    images = images.cuda()
 
                 _, embeddings = model(images)
+
+                if cuda:
+                    embeddings = embeddings.cpu()
 
                 for i in range(len(images)):
                     embedding = embeddings[i].numpy()
