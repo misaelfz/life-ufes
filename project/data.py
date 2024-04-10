@@ -37,7 +37,7 @@ def save_augmented(path, batch_size):
 
     if not os.path.exists(file):
         mnist = get_dataset(path, "mnist")
-        recrop = v2.RandomResizedCrop(28, (0.50, 0.66))
+        recrop = v2.RandomResizedCrop(28, (0.50, 0.75))
         rotate = lambda x: v2.RandomRotation(degrees=choice([(-45, -30), (30, 45)]))(x)
 
         augmented = []
