@@ -249,7 +249,7 @@ def plot_embeddings(target, data_path):
     plt.show()
 
 
-def study_entropy(path, descending):
+def study_entropy(path, reverse=True):
     classified = get_dataset(path, "classified")
 
     for key in classified:
@@ -259,7 +259,7 @@ def study_entropy(path, descending):
             entropy = stats.entropy(pk=probabilities, base=2)
             classified[key][i] = (entropy, (image, label, logits, embeddings))
 
-        classified[key].sort(key=lambda x: x[0], reverse=descending)
+        classified[key].sort(key=lambda x: x[0], reverse=reverse)
 
     for key in classified:
         entropy, item = classified[key][0]
