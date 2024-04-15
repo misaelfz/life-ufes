@@ -247,3 +247,28 @@ def plot_embeddings(target, data_path):
     plt.colorbar()
     plt.title("MNIST")
     plt.show()
+
+
+def study_entropy(path, descending):
+    classified = get_dataset(path, "classified")
+
+    for key in classified:
+        for i in range(len(classified[key])):
+            image, label, logits, embeddings = classified[key][i]
+            probabilities = softmax(tensor(logits), dim=0).numpy()
+            entropy = stats.entropy(pk=probabilities, base=2)
+            classified[key][i] = (entropy, (image, label, logits, embeddings))
+
+        classified[key].sort(key=lambda x: x[0], reverse=descending)
+
+    for key in classified:
+        entropy, item = classified[key][0]
+        image, label, logits, _ = item
+
+        plt.imshow(image[0].squeeze(), cmap="gray")
+        plt.title(label)
+        plt.show()
+
+        print(f"Logits: {logits.tolist()}")
+        print(f"Softmax: {softmax(tensor(logits.tolist()), dim=0).numpy().tolist()}")
+        print(f"Entropy: {entropy}")
