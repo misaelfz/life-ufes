@@ -7,6 +7,7 @@ import umap.umap_ as umap
 import matplotlib.pyplot as plt
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
+from scipy.spatial.distance import cdist
 from torch import no_grad, tensor, softmax
 from torchvision.transforms import ToTensor, v2
 from sklearn.model_selection import train_test_split
@@ -141,6 +142,63 @@ def save_entropy(path, batch_size):
             pickle.dump(entropy, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def save_farthest(path, batch_size, metric):
+    valid_metrics = ["euclidean", "cosine"]
+    assert metric in valid_metrics
+
+    file = os.path.join(path, f"{metric}_dataset.pkl")
+
+    if not os.path.exists(file):
+        classified = get_dataset(path, "classified")
+
+        farthest = []
+        subset_embeddings = []
+        classified_embeddings = {
+            0: [item[3] for item in classified[0]],
+            1: [item[3] for item in classified[1]],
+            2: [item[3] for item in classified[2]],
+            3: [item[3] for item in classified[3]],
+            4: [item[3] for item in classified[4]],
+            5: [item[3] for item in classified[5]],
+            6: [item[3] for item in classified[6]],
+            7: [item[3] for item in classified[7]],
+            8: [item[3] for item in classified[8]],
+            9: [item[3] for item in classified[9]],
+        }
+
+        size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
+
+        for i in range(size):
+            if (i + 1) % (size // 10) == 0:
+                print(f"Metric: {metric} | Progress: {int(((i + 1) * 100) // size)}%")
+
+            for key in classified.keys():
+                if not farthest:
+                    item = classified[key].pop(-1)
+                    embedding = classified_embeddings[key].pop(-1)
+                    image, label, _, _ = item
+                    farthest.append((image, label))
+                    subset_embeddings.append(embedding)
+                else:
+                    distances = cdist(subset_embeddings, classified_embeddings[key], metric)
+
+                    if metric == "euclidean":
+                        index = distances.sum(axis=0).argmax()
+                    elif metric == "cosine":
+                        index = distances.sum(axis=0).argmin()
+
+                    item = classified[key].pop(index)
+                    embedding = classified_embeddings[key].pop(index)
+                    image, label, _, _ = item
+                    farthest.append((image, label))
+                    subset_embeddings.append(embedding)
+
+        farthest = DataLoader(farthest, batch_size=batch_size, shuffle=True)
+
+        with open(file, "wb") as handle:
+            pickle.dump(farthest, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 def check_datasets(path):
     files = [
         "mnist_dataset.pkl",
@@ -148,6 +206,8 @@ def check_datasets(path):
         "classified_dataset.pkl",
         "random_dataset.pkl",
         "entropy_dataset.pkl",
+        "euclidean_dataset.pkl",
+        "cosine_dataset.pkl",
     ]
 
     for file in files:
@@ -162,6 +222,8 @@ def save_datasets(data_path, model, batch_size, device):
         save_classified(data_path, model, device)
         save_random(data_path, batch_size)
         save_entropy(data_path, batch_size)
+        save_farthest(data_path, batch_size, "euclidean")
+        save_farthest(data_path, batch_size, "cosine")
         check_datasets(data_path)
 
 
