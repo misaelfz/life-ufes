@@ -157,10 +157,12 @@ def check_datasets(path):
 def save_datasets(data_path, model, batch_size, device):
     save_mnist(data_path, batch_size)
     save_augmented(data_path, batch_size)
-    save_classified(data_path, model, device)
-    save_random(data_path, batch_size)
-    save_entropy(data_path, batch_size)
-    check_datasets(data_path)
+
+    if model:
+        save_classified(data_path, model, device)
+        save_random(data_path, batch_size)
+        save_entropy(data_path, batch_size)
+        check_datasets(data_path)
 
 
 def get_dataset(path, target):
@@ -264,11 +266,17 @@ def study_entropy(path, reverse=True):
     for key in classified:
         entropy, item = classified[key][0]
         image, label, logits, _ = item
+        softmaxs = softmax(tensor(logits.tolist()), dim=0).numpy().tolist()
 
         plt.imshow(image[0].squeeze(), cmap="gray")
         plt.title(label)
         plt.show()
 
-        print(f"Logits: {logits.tolist()}")
-        print(f"Softmax: {softmax(tensor(logits.tolist()), dim=0).numpy().tolist()}")
-        print(f"Entropy: {entropy}")
+        print(f"\nLogits: {logits.tolist()}")
+        print(f"Softmax: {softmaxs}")
+        print(f"Entropy: {entropy}\n")
+
+        for i, probability in enumerate(softmaxs):
+            print(f"Label {i} probability: {(probability * 100):.2f}%")
+
+        print()
