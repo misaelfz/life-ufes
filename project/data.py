@@ -58,7 +58,6 @@ def save_augmented(path, batch_size):
 
 def save_classified(path, model, device):
     cuda = device == "cuda"
-
     file = os.path.join(path, "classified_dataset.pkl")
 
     if not os.path.exists(file):
@@ -112,8 +111,9 @@ def save_random(path, batch_size):
             pickle.dump(random, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def save_entropy(path, batch_size):
-    file = os.path.join(path, "entropy_dataset.pkl")
+def save_entropy(path, batch_size, reverse):
+    order = "max" if reverse else "min"
+    file = os.path.join(path, f"{order}_entropy_dataset.pkl")
 
     if not os.path.exists(file):
         classified = get_dataset(path, "classified")
@@ -125,7 +125,7 @@ def save_entropy(path, batch_size):
                 entropy = stats.entropy(pk=probabilities, base=2)
                 classified[key][i] = (entropy, (image, label, logits, embeddings))
 
-            classified[key].sort(key=lambda x: x[0], reverse=True)
+            classified[key].sort(key=lambda x: x[0], reverse=reverse)
 
         entropy = []
         size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
@@ -167,6 +167,7 @@ def save_farthest(path, batch_size, metric):
         }
 
         size = int((sum(len(v) for v in classified.values()) * 0.01) / len(classified))
+        print(f"Metric: {metric} | Progress: 0%")
 
         for i in range(size):
             if (i + 1) % (size // 10) == 0:
@@ -199,32 +200,38 @@ def save_farthest(path, batch_size, metric):
             pickle.dump(farthest, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def check_datasets(path):
+def save_base_datasets(data_path, batch_size):
+    save_mnist(data_path, batch_size)
+    save_augmented(data_path, batch_size)
+
     files = [
         "mnist_dataset.pkl",
         "augmented_dataset.pkl",
+    ]
+
+    for file in files:
+        assert os.path.exists(os.path.join(data_path, file))
+
+
+def save_new_datasets(data_path, model, batch_size, device):
+    save_classified(data_path, model, device)
+    save_random(data_path, batch_size)
+    save_entropy(data_path, batch_size, True)
+    save_entropy(data_path, batch_size, False)
+    save_farthest(data_path, batch_size, "euclidean")
+    save_farthest(data_path, batch_size, "cosine")
+
+    files = [
         "classified_dataset.pkl",
         "random_dataset.pkl",
-        "entropy_dataset.pkl",
+        "max_entropy_dataset.pkl",
+        "min_entropy_dataset.pkl",
         "euclidean_dataset.pkl",
         "cosine_dataset.pkl",
     ]
 
     for file in files:
-        assert os.path.exists(os.path.join(path, file))
-
-
-def save_datasets(data_path, model, batch_size, device):
-    save_mnist(data_path, batch_size)
-    save_augmented(data_path, batch_size)
-
-    if model:
-        save_classified(data_path, model, device)
-        save_random(data_path, batch_size)
-        save_entropy(data_path, batch_size)
-        save_farthest(data_path, batch_size, "euclidean")
-        save_farthest(data_path, batch_size, "cosine")
-        check_datasets(data_path)
+        assert os.path.exists(os.path.join(data_path, file))
 
 
 def get_dataset(path, target):
@@ -269,7 +276,6 @@ def plot_batch(dataset, predicts):
 
 def save_embeddings(model, target, dataset, data_path, device):
     cuda = device == "cuda"
-
     file = os.path.join(data_path, f"{target}_embeddings.pkl")
 
     if not os.path.exists(file):
@@ -313,7 +319,7 @@ def plot_embeddings(target, data_path):
     plt.show()
 
 
-def study_entropy(path, reverse=True):
+def study_entropy(path, reverse):
     classified = get_dataset(path, "classified")
 
     for key in classified:

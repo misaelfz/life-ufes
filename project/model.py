@@ -1,4 +1,6 @@
+import os
 import time
+import torch
 import data as dt
 import matplotlib.pyplot as plt
 from torch import nn, optim, max, save, no_grad
@@ -163,3 +165,10 @@ def test_model(model, test_set, device):
                 first = False
 
     print("\nAccuracy: {:.2f}%".format((correct / total) * 100))
+
+
+def load_model(model, model_path, target, device):
+    model_load = os.path.join(model_path, f"{target}_best.pth")
+    model.load_state_dict(torch.load(model_load, map_location=torch.device(device)))
+
+    return model
