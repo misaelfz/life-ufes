@@ -164,7 +164,7 @@ def test_model(model, test_set, device):
                 dt.plot_batch(test_set, predicts)
                 first = False
 
-    print("\nAccuracy: {:.2f}%".format((correct / total) * 100))
+    print("\nAccuracy: {:.2f}%\n".format((correct / total) * 100))
 
 
 def load_model(model, model_path, target, device):
