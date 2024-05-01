@@ -200,6 +200,119 @@ def save_farthest(path, batch_size, metric):
             pickle.dump(farthest, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def save_new_farthest(path, batch_size, model, device, metric):
+    valid_metrics = ["euclidean", "cosine"]
+    assert metric in valid_metrics
+
+    file = os.path.join(path, f"new_{metric}_dataset.pkl")
+
+    if not os.path.exists(file):
+        augmented, full_embeddings, farthest, subset_embeddings, size = get_checkpoint(path, model, device)
+        max_size = 2500
+
+        print(f"Metric: {metric} | Progress: {int((size / max_size) * 100)}%")
+
+        for i in range(size, max_size):
+            if (i + 1) % (max_size // 10) == 0:
+                set_checkpoint(path, augmented, full_embeddings, farthest, subset_embeddings, len(farthest))
+                print(f"Metric: {metric} | Progress: {int(((i + 1) / (max_size)) * 100)}%")
+
+            if not farthest:
+                image, label = augmented.pop(-1)
+                farthest.append((image, label))
+                embedding = full_embeddings.pop(-1)
+                subset_embeddings.append(embedding)
+                continue
+
+            distances = cdist(subset_embeddings, full_embeddings, metric)
+
+            if metric == "euclidean":
+                index = distances.sum(axis=0).argmax()
+            elif metric == "cosine":
+                index = distances.sum(axis=0).argmin()
+
+            augmented[index], augmented[-1] = augmented[-1], augmented[index]
+            image, label = augmented.pop(-1)
+            farthest.append((image, label))
+
+            full_embeddings[index], full_embeddings[-1] = full_embeddings[-1], full_embeddings[index]
+            embedding = full_embeddings.pop(-1)
+            subset_embeddings.append(embedding)
+
+        farthest = DataLoader(farthest, batch_size=batch_size, shuffle=True)
+
+        with open(file, "wb") as handle:
+            pickle.dump(farthest, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def get_full_embeddings(path, model, device):
+    cuda = device == "cuda"
+    file = os.path.join(path, "full_embeddings.pkl")
+
+    if not os.path.exists(file):
+        dataset = get_dataset(path, "augmented")
+        augmented = []
+        full_embeddings = []
+
+        model.eval()
+        with no_grad():
+            for images, labels in dataset:
+                if cuda:
+                    images = images.cuda()
+
+                _, embeddings = model(images)
+
+                if cuda:
+                    images, embeddings = images.cpu(), embeddings.cpu()
+
+                for i in range(len(images)):
+                    image = images[i].numpy()
+                    label = labels[i].item()
+                    embedding = embeddings[i].numpy()
+                    augmented.append((image, label))
+                    full_embeddings.append((embedding))
+
+        return augmented, full_embeddings
+
+
+def get_checkpoint(path, model, device):
+    file = os.path.join(path, "checkpoint.pkl")
+
+    if os.path.exists(file):
+        with open(file, "rb") as handle:
+            checkpoint = pickle.load(handle)
+
+        augmented = checkpoint["augmented"]
+        full_embeddings = checkpoint["full_embeddings"]
+        farthest = checkpoint["farthest"]
+        subset_embeddings = checkpoint["subset_embeddings"]
+        size = checkpoint["size"]
+
+        return augmented, full_embeddings, farthest, subset_embeddings, size
+
+    augmented, full_embeddings = get_full_embeddings(path, model, device)
+    farthest = []
+    subset_embeddings = []
+    size = int(0)
+
+    return augmented, full_embeddings, farthest, subset_embeddings, size
+
+
+def set_checkpoint(path, augmented, full_embeddings, farthest, subset_embeddings, size):
+    file = os.path.join(path, "checkpoint.pkl")
+
+    checkpoint = {
+        "augmented": augmented,
+        "full_embeddings": full_embeddings,
+        "farthest": farthest,
+        "subset_embeddings": subset_embeddings,
+        "size": size,
+    }
+
+    with open(file, "wb") as handle:
+        pickle.dump(checkpoint, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 def save_base_datasets(data_path, batch_size):
     save_mnist(data_path, batch_size)
     save_augmented(data_path, batch_size)
@@ -220,6 +333,8 @@ def save_new_datasets(data_path, model, batch_size, device):
     save_entropy(data_path, batch_size, False)
     save_farthest(data_path, batch_size, "euclidean")
     save_farthest(data_path, batch_size, "cosine")
+    save_new_farthest(data_path, batch_size, model, device, "euclidean")
+    # save_new_farthest(data_path, batch_size, model, device, "cosine")
 
     files = [
         "classified_dataset.pkl",
@@ -228,6 +343,8 @@ def save_new_datasets(data_path, model, batch_size, device):
         "min_entropy_dataset.pkl",
         "euclidean_dataset.pkl",
         "cosine_dataset.pkl",
+        "new_euclidean_dataset.pkl",
+        # "new_cosine_dataset.pkl",
     ]
 
     for file in files:
